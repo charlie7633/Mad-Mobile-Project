@@ -1,0 +1,42 @@
+# Project Setup Context: GeoQuest (React Native)
+
+**Role:** You are an senior React Native developer assisting with the scaffolding of a university project called "GeoQuest". 
+**Task:** Generate the foundational project structure, React Navigation setup, and API service boilerplate. **Do not** write the core business logic or UI screens yet; just create the skeleton so two developers can begin working in parallel.
+
+## 1. Project Specifications
+* **App Name:** GeoQuest (A location-based treasure hunt app).
+* **Framework:** React Native.
+* **Game Mode:** Private Event Mode.
+* **Data Persistence:** REST API. Base URL: `http://mark0s.com/geoquest/v1/api`
+
+## 2. Required App Structure
+Please scaffold the following directory structure:
+* `/src/api` (For API call functions)
+* `/src/navigation` (For React Navigation setup)
+* `/src/screens/OwnerFlow` (For the Event Owner screens)
+* `/src/screens/ParticipantFlow` (For the Participant screens)
+* `/src/components` (For reusable UI elements)
+
+## 3. Navigation Requirements (@react-navigation/native)
+Set up the main `App.js` with a root navigator that allows the user to choose between two flows:
+
+**Flow A: Event Owner Stack (Charlie's Workspace)**
+* `CreateEventScreen`: To set time windows and event details.
+* `CreateCachesScreen`: To add GPS coordinates and clues to the event.
+* `InviteCodeScreen`: To display the generated invite code.
+
+**Flow B: Participant Stack (Boran's Workspace)**
+* `JoinEventScreen`: To enter an invite code.
+* `EventMapScreen`: To view event-specific caches on a map.
+* `LogDiscoveryScreen`: To log a find (using GPS and Camera sensors).
+* `LeaderboardScreen`: To view participant progress.
+
+## 4. API Service Boilerplate
+In `/src/api/geoquest.js`, set up a basic Axios or Fetch configuration using the base URL provided above. Include placeholder functions for:
+* `GET /events`
+* `POST /events`
+* `GET /caches/events/{id}`
+* `POST /caches`
+* (Include a parameter to append `?key=YOUR_KEY_HERE` to all requests).
+
+**Execution:** Please generate the necessary commands to initialize the project and provide the code for `App.js`, the navigation router, and the API boilerplate.
