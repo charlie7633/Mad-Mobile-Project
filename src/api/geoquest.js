@@ -1,23 +1,15 @@
 import axios from 'axios';
 
 const BASE_URL = 'http://mark0s.com/geoquest/v1/api';
-const API_KEY = '16gv8f';
+const API_KEY = 'zaur5u';
 
 // Configure Axios instance
 const apiClient = axios.create({
   baseURL: BASE_URL,
-});
-
-// Add request interceptor to append the API key parameter to every request
-apiClient.interceptors.request.use(
-  (config) => {
-    config.params = { ...config.params, key: API_KEY };
-    return config;
+  params: {
+    key: API_KEY,
   },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+});
 
 // --- API Service Functions ---
 
