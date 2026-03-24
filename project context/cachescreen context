@@ -1,0 +1,33 @@
+# Task: Build CreateCachesScreen.js (React Native / Expo)
+
+**Role:** Expert React Native Developer.
+**Context:** We are continuing the "Event Owner Flow" for the GeoQuest app. We need to build the `CreateCachesScreen.js`. The previous screen passes the newly created event's ID via `route.params.eventId`.
+**Task:** Create a functional React Native form that allows the Event Owner to add multiple caches to their event. 
+
+## 1. UI Requirements
+Please build a clean, modern form using functional components and `useState` wrapped in a `ScrollView`. The form must collect:
+* **Cache Name:** Text Input.
+* **Cache Description:** Multiline Text Input.
+* **Cache Clue (or riddle):** Multiline Text Input.
+* **Cache Points:** Numeric Text Input (keyboardType="numeric").
+* **Latitude:** Numeric Text Input.
+* **Longitude:** Numeric Text Input.
+
+**Buttons Required:**
+1. **"Save This Cache":** Submits the current form data to the API.
+2. **"Finish Event Creation":** A secondary button that navigates the user to the `InviteCodeScreen`.
+
+## 2. API Integration Specifications
+* Import the Axios instance from `/src/api/geoquest.js`.
+* Retrieve the Event ID using `const { eventId } = route.params;`.
+* On "Save This Cache" submission, construct a payload exactly matching the API's PascalCase expectations:
+  ```javascript
+  {
+    CacheName: name,
+    CacheDescription: description,
+    CacheEventID: eventId,
+    CacheClue: clue,
+    CachePoints: parseInt(points, 10), // Must be parsed to a number
+    CacheLatitude: parseFloat(latitude), // Must be parsed to a number
+    CacheLongitude: parseFloat(longitude) // Must be parsed to a number
+  }
