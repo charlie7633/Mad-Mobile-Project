@@ -1,16 +1,41 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import apiClient from '../../api/geoquest';
 
-const LeaderboardScreen = () => {
+const LeaderboardScreen = ({ route }) => {
+  const { EventID } = route.params;
+
+  const [players, setPlayers] = useState([]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await apiClient.get('/finds');
+      const eventFinds = response.data.filter(
+        (find) => find.EventID === parseInt(EventID)
+      );
+      setPlayers(eventFinds);
+    } catch (error) {
+      console.log('Error fetching leaderboard:', error);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Leaderboard</Text>
-      <Text style={styles.subtitle}>Participant progress and rankings will be shown here.</Text>
-      {/* List placeholder */}
+      <Text style={styles.subtitle}>
+        Participant progress and rankings
+      </Text>
+
       <View style={styles.list}>
-        <Text>1. Player123 - 5 Caches</Text>
-        <Text>2. Anna - 3 Caches</Text>
-        <Text>3. Mark - 2 Caches</Text>
+        {players.map((player, index) => (
+          <Text key={index}>
+            Player {player.FindPlayerID} - Cache {player.FindCacheID}
+          </Text>
+        ))}
       </View>
     </View>
   );
