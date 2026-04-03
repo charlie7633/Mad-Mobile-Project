@@ -9,7 +9,8 @@ const JoinEventScreen = ({ navigation }) => {
       Alert.alert('Error', 'Please enter an invite code.');
       return;
     }
-    navigation.navigate('EventMap');
+    // FIX: Actually pass the code forward to the map!
+    navigation.navigate('EventMap', { eventId: code });
   };
 
   return (
