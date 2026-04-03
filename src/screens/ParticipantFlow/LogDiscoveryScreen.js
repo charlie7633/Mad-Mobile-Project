@@ -1,112 +1,175 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, Alert, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Button, Alert, Image, TouchableOpacity } from 'react-native';
 import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker';
-import apiClient from '../../api/geoquest';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
-const LogDiscoveryScreen = ({ navigation, route }) => {
-  const { CacheID, CacheLatitude, CacheLongitude } = route.params;
+// Haversine formula to calculate distance in meters
+const getDistance = (lat1, lon1, lat2, lon2) => {
+  const toRad = x => (x * Math.PI) / 180;
+  const R = 6371e3; // meters
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c; 
+};
 
-  const [isNear, setIsNear] = useState(false);
-  const [photo, setPhoto] = useState(null);
+const LogDiscoveryScreen = ({ route, navigation }) => {
+  const { cache } = route.params;
+
+  const [location, setLocation] = useState(null);
+  const [distance, setDistance] = useState(null);
+  const [photoUri, setPhotoUri] = useState(null);
+  
+  const [showCamera, setShowCamera] = useState(false);
+  const cameraRef = useRef(null);
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const [locationPerm, setLocationPerm] = useState(null);
 
   useEffect(() => {
-    getLocation();
-  }, []);
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      setLocationPerm(status);
+      if (status !== 'granted') {
+        Alert.alert('Error', 'Permission to access location was denied');
+        return;
+      }
 
-  const getLocation = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
+      const loc = await Location.getCurrentPositionAsync({});
+      setLocation(loc.coords);
+      
+      const dist = getDistance(
+        loc.coords.latitude, 
+        loc.coords.longitude, 
+        // fallback in case latitude/longitude is not present, though assuming it is based on props
+        cache.CacheLatitude, 
+        cache.CacheLongitude
+      );
+      setDistance(dist);
+    })();
+  }, [cache]);
 
-    if (status !== 'granted') {
-      Alert.alert('Permission denied');
+  const handleRefreshLocation = async () => {
+    if (locationPerm !== 'granted') return;
+    const loc = await Location.getCurrentPositionAsync({});
+    setLocation(loc.coords);
+    const dist = getDistance(
+      loc.coords.latitude, 
+      loc.coords.longitude, 
+      cache.CacheLatitude, 
+      cache.CacheLongitude
+    );
+    setDistance(dist);
+  };
+
+  const handleTakePhotoEvidence = () => {
+    if (!permission?.granted) {
+      requestPermission();
       return;
     }
-
-    let location = await Location.getCurrentPositionAsync({});
-    checkDistance(location.coords.latitude, location.coords.longitude);
+    setShowCamera(true);
   };
 
-  const checkDistance = (userLat, userLng) => {
-    const distance = Math.sqrt(
-      Math.pow(userLat - CacheLatitude, 2) +
-      Math.pow(userLng - CacheLongitude, 2)
+  const takePicture = async () => {
+    if (cameraRef.current) {
+      const photo = await cameraRef.current.takePictureAsync();
+      setPhotoUri(photo.uri);
+      setShowCamera(false);
+    }
+  };
+
+  const handleLogFind = () => {
+    // Action: When "Log this Find" is clicked, show a success Alert and use navigation.goBack()
+    Alert.alert('Success', 'You have successfully logged this find!');
+    navigation.goBack();
+  };
+
+  if (showCamera) {
+    return (
+      <View style={styles.container}>
+        <CameraView style={styles.camera} ref={cameraRef} facing="back">
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.captureButton} onPress={() => setShowCamera(false)}>
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+              <Text style={styles.buttonText}>Capture</Text>
+            </TouchableOpacity>
+          </View>
+        </CameraView>
+      </View>
     );
+  }
 
-    if (distance < 0.001) {
-      setIsNear(true);
-    }
-  };
-
-  const takePhoto = async () => {
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: false,
-      quality: 0.5,
-    });
-
-    if (!result.canceled) {
-      setPhoto(result.assets[0].uri);
-    }
-  };
-
-  const submitDiscovery = async () => {
-    try {
-      await apiClient.post('/finds', {
-        FindCacheID: CacheID,
-        FindPlayerID: 1,
-        FindDatetime: new Date().toISOString()
-      });
-
-      Alert.alert('Success', 'Discovery logged!');
-      navigation.goBack();
-    } catch (error) {
-      console.log(error);
-      Alert.alert('Error submitting discovery');
-    }
-  };
+  const isWithinDistance = distance !== null && distance <= 50;
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Log Discovery</Text>
+      {cache?.CacheName && <Text style={styles.subtitle}>{cache.CacheName}</Text>}
+      
+      <View style={styles.section}>
+        <Text style={styles.label}>Distance to Cache:</Text>
+        {distance !== null ? (
+          <Text style={styles.value}>{distance.toFixed(2)} meters</Text>
+        ) : (
+          <Text style={styles.value}>Calculating...</Text>
+        )}
+        <Button title="Refresh Location" onPress={handleRefreshLocation} />
+      </View>
 
-      <Text style={styles.subtitle}>
-        {isNear ? 'You are near the cache ✅' : 'Move closer to the cache ❌'}
-      </Text>
+      <View style={styles.section}>
+        {photoUri ? (
+          <>
+            <Image source={{ uri: photoUri }} style={styles.image} />
+            <Button title="Retake Photo Evidence" onPress={handleTakePhotoEvidence} />
+          </>
+        ) : (
+          <Button title="Take Photo Evidence" onPress={handleTakePhotoEvidence} />
+        )}
+      </View>
 
-      <Button title="Take Photo" onPress={takePhoto} />
-
-      {photo && (
-        <Image source={{ uri: photo }} style={styles.image} />
-      )}
-
-      <Button
-        title="Submit Discovery"
-        onPress={submitDiscovery}
-        disabled={!isNear || !photo}
-      />
+      <View style={styles.logSection}>
+        <Button 
+          title="Log this Find" 
+          onPress={handleLogFind} 
+          disabled={!isWithinDistance || !photoUri}
+        />
+        {!isWithinDistance && distance !== null && (
+          <Text style={styles.errorText}>You must be within 50 meters of the cache.</Text>
+        )}
+        {!photoUri && (
+          <Text style={styles.errorText}>You must take photo evidence.</Text>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16, // removed center alignment for better layout
+  container: { flex: 1, padding: 16, backgroundColor: '#fff', justifyContent: 'center' },
+  camera: { flex: 1 },
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
+  subtitle: { fontSize: 18, color: '#666', marginBottom: 20, textAlign: 'center' },
+  section: { marginVertical: 15, alignItems: 'center' },
+  label: { fontSize: 16, color: '#333' },
+  value: { fontSize: 20, fontWeight: 'bold', color: '#007AFF', marginVertical: 5 },
+  image: { width: 200, height: 200, marginBottom: 10, borderRadius: 10 },
+  logSection: { marginTop: 30, alignItems: 'center' },
+  errorText: { color: 'red', marginTop: 5, textAlign: 'center' },
+  buttonContainer: { 
+    flex: 1, 
+    backgroundColor: 'transparent', 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    margin: 20, 
+    alignItems: 'flex-end'
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 24,
-  },
-  image: {
-    width: 200,
-    height: 200,
-    marginVertical: 20,
-  },
+  captureButton: { backgroundColor: 'white', padding: 15, borderRadius: 10, paddingHorizontal: 25 },
+  buttonText: { fontSize: 18, color: 'black', fontWeight: 'bold' }
 });
 
 export default LogDiscoveryScreen;

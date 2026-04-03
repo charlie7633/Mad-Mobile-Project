@@ -1,43 +1,31 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  Button, 
-  StyleSheet, 
-  Alert, 
-  ActivityIndicator, 
-  ScrollView, 
-  KeyboardAvoidingView, 
-  Platform 
-} from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { createCache } from '../../api/geoquest';
 
 const CreateCachesScreen = ({ navigation, route }) => {
-  // Grab the eventId from navigation route params
   const eventId = route?.params?.eventId || 'unknown-event-id';
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [clue, setClue] = useState('');
   const [points, setPoints] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [longitude, setLongitude] = useState('');
-  
+  const [selectedLocation, setSelectedLocation] = useState(null); // Replaces manual lat/lng
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleMapPress = (e) => {
+    setSelectedLocation(e.nativeEvent.coordinate);
+  };
+
   const handleSaveCache = async () => {
-    if (!name.trim() || !description.trim() || !clue.trim() || !points || !latitude || !longitude) {
-      Alert.alert('Validation Error', 'Please fill out all fields before saving the cache.');
+    if (!name.trim() || !description.trim() || !clue.trim() || !points || !selectedLocation) {
+      Alert.alert('Validation Error', 'Please fill out all fields and tap the map to drop a pin.');
       return;
     }
 
     const parsedPoints = parseInt(points, 10);
-    const parsedLat = parseFloat(latitude);
-    const parsedLng = parseFloat(longitude);
-
-    if (isNaN(parsedPoints) || isNaN(parsedLat) || isNaN(parsedLng)) {
-      Alert.alert('Validation Error', 'Points and coordinates must be valid numbers.');
+    if (isNaN(parsedPoints)) {
+      Alert.alert('Validation Error', 'Points must be a valid number.');
       return;
     }
 
@@ -50,109 +38,50 @@ const CreateCachesScreen = ({ navigation, route }) => {
         CacheEventID: eventId,
         CacheClue: clue,
         CachePoints: parsedPoints,
-        CacheLatitude: parsedLat,
-        CacheLongitude: parsedLng
+        CacheLatitude: selectedLocation.latitude,
+        CacheLongitude: selectedLocation.longitude
       };
 
       await createCache(payload);
-      
-      Alert.alert('Success', 'Cache has been saved successfully!');
-      
-      // Clear form for the next cache entry
-      setName('');
-      setDescription('');
-      setClue('');
-      setPoints('');
-      setLatitude('');
-      setLongitude('');
+      Alert.alert('Success', 'Cache saved! Add another or finish.');
 
+      // Reset form
+      setName(''); setDescription(''); setClue(''); setPoints(''); setSelectedLocation(null);
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to save the cache. Please try again later.');
+      Alert.alert('Error', 'Failed to save the cache.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleFinishEvent = () => {
-    navigation.navigate('InviteCode', { eventId });
-  };
-
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Add Caches</Text>
-        <Text style={styles.subtitle}>Add hidden caches to Event: {eventId}</Text>
+        <Text style={styles.title}>Add Caches to Event</Text>
+        <Text style={styles.subtitle}>ID: {eventId}</Text>
 
-        <Text style={styles.label}>Cache Name</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., Hidden treasure behind library"
-          value={name}
-          onChangeText={setName}
-        />
+        <Text style={styles.label}>Tap Map to Drop Cache Pin</Text>
+        <View style={styles.mapContainer}>
+          <MapView
+            style={styles.map}
+            onPress={handleMapPress}
+            initialRegion={{ latitude: 51.5074, longitude: -0.1278, latitudeDelta: 0.1, longitudeDelta: 0.1 }}
+          >
+            {selectedLocation && <Marker coordinate={selectedLocation} />}
+          </MapView>
+        </View>
 
-        <Text style={styles.label}>Cache Description</Text>
-        <TextInput
-          style={[styles.input, styles.multiline]}
-          placeholder="Provide context or history..."
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={3}
-        />
-
-        <Text style={styles.label}>Cache Clue (Riddle)</Text>
-        <TextInput
-          style={[styles.input, styles.multiline]}
-          placeholder="Enter a riddle to help find the cache..."
-          value={clue}
-          onChangeText={setClue}
-          multiline
-          numberOfLines={3}
-        />
-
-        <Text style={styles.label}>Cache Points</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., 50"
-          value={points}
-          onChangeText={setPoints}
-          keyboardType="numeric"
-        />
-
-        <Text style={styles.label}>Latitude</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., -27.470125"
-          value={latitude}
-          onChangeText={setLatitude}
-          keyboardType="numeric"
-        />
-
-        <Text style={styles.label}>Longitude</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="e.g., 153.021072"
-          value={longitude}
-          onChangeText={setLongitude}
-          keyboardType="numeric"
-        />
+        <TextInput style={styles.input} placeholder="Cache Name" value={name} onChangeText={setName} />
+        <TextInput style={[styles.input, styles.multiline]} placeholder="Description" value={description} onChangeText={setDescription} multiline />
+        <TextInput style={[styles.input, styles.multiline]} placeholder="Clue / Riddle" value={clue} onChangeText={setClue} multiline />
+        <TextInput style={styles.input} placeholder="Points (e.g. 50)" value={points} onChangeText={setPoints} keyboardType="numeric" />
 
         <View style={styles.buttonGroup}>
-          {isLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" style={{ marginVertical: 10 }} />
-          ) : (
+          {isLoading ? <ActivityIndicator size="large" color="#0000ff" /> : (
             <>
-              <View style={styles.primaryButton}>
-                <Button title="Save This Cache" onPress={handleSaveCache} color="#28a745" />
-              </View>
-              <View style={styles.secondaryButton}>
-                <Button title="Finish Event Creation" onPress={handleFinishEvent} />
-              </View>
+              <Button title="Save This Cache" onPress={handleSaveCache} color="#28a745" />
+              <View style={{ marginTop: 10 }}><Button title="Finish Event Creation" onPress={() => navigation.navigate('InviteCode', { eventId })} /></View>
             </>
           )}
         </View>
@@ -162,53 +91,16 @@ const CreateCachesScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  multiline: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  buttonGroup: {
-    marginTop: 20,
-    gap: 12,
-  },
-  primaryButton: {
-    marginBottom: 10,
-  },
-  secondaryButton: {
-    marginTop: 10,
-  }
+  container: { flex: 1, backgroundColor: '#fff' },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  title: { fontSize: 24, fontWeight: 'bold' },
+  subtitle: { fontSize: 14, color: '#666', marginBottom: 15 },
+  label: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
+  mapContainer: { height: 250, borderRadius: 8, overflow: 'hidden', marginBottom: 16, borderWidth: 1, borderColor: '#ddd' },
+  map: { flex: 1 },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, marginBottom: 12, backgroundColor: '#f9f9f9' },
+  multiline: { height: 60, textAlignVertical: 'top' },
+  buttonGroup: { marginTop: 10 }
 });
 
 export default CreateCachesScreen;
